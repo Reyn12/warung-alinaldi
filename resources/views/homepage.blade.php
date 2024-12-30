@@ -124,6 +124,21 @@
             color: #374151 !important;
             opacity: 1 !important;
         }
+
+        /* Style untuk mengatur ukuran scanner di desktop */
+        @media (min-width: 768px) {
+            .swal2-popup {
+                width: 400px !important;
+            }
+            #reader {
+                max-width: 400px !important;
+                margin: 0 auto !important;
+            }
+            #reader video {
+                max-height: 300px !important;
+                object-fit: cover !important;
+            }
+        }
     </style>
 </head>
 <body class="bg-gradient-to-b from-sky-400 to-white min-h-screen font-lato">
@@ -131,7 +146,7 @@
         <!-- Header -->
         <div class="flex justify-between items-center mb-6">
             <div class="flex items-center gap-3">
-                <img src="{{ asset('images/icons/icProfile.svg') }}" alt="Avatar" class="w-12 h-12 rounded-full">
+                <img src="{{ asset('images/icons/icProfile.svg') }}" alt="Avatar" class="w-12 h-12 rounded-full mr-2">
                 <div>
                     <p class="text-white">Selamat Datang,</p>
                     <p class="text-white font-semibold">Toko Alinaldi</p>
@@ -308,40 +323,46 @@
 
     <script>
         let html5Qrcode = null;
+        let lastResult = null;
 
         function onScanSuccess(decodedText, decodedResult) {
-            // Stop scanner
-            stopScanner();
-            
-            // Close modal
-            Swal.close();
+            lastResult = decodedText;
+            console.log("Code detected:", decodedText);
+        }
 
-            // Show loading
-            Swal.fire({
-                title: 'Mencari Produk',
-                html: 'Mohon tunggu sebentar...',
-                allowOutsideClick: false,
-                showConfirmButton: false,
-                didOpen: () => {
-                    Swal.showLoading();
-                }
-            });
+        async function scanNow() {
+            if (lastResult) {
+                // Stop scanner
+                stopScanner();
+                
+                // Close modal
+                Swal.close();
 
-            // Redirect ke halaman detail produk
-            setTimeout(() => {
-                window.location.href = `/products/scan/${encodeURIComponent(decodedText)}`;
-            }, 1000);
+                // Redirect ke halaman hasil scan
+                window.location.href = `/products/scan/${encodeURIComponent(lastResult)}`;
+            } else {
+                Swal.fire({
+                    title: 'Barcode tidak terdeteksi',
+                    text: 'Pastikan barcode berada dalam kotak scanner',
+                    icon: 'warning'
+                });
+            }
         }
 
         async function showQrisModal() {
             const modal = await Swal.fire({
                 title: 'Scan Barcode',
                 html: `
-                    <div id="reader" style="width: 100%"></div>
-                    <div class="mt-4 flex justify-center">
-                        <button onclick="window.location.href='/products/search'" class="px-4 py-2 border border-blue-300 rounded-lg hover:bg-blue-50 mb-4 bg-blue-500 transition-colors text-white">
-                            Cari Manual
-                        </button>
+                    <div class="mb-4 bg-white p-6 rounded-xl w-full h-full">
+                        <div id="reader" style="width: 100%"></div>
+                        <div class="mt-4 flex justify-center gap-2">
+                            <button id="scanButton" onclick="scanNow()" class="px-4 py-2 border border-blue-300 rounded-lg hover:bg-blue-50 mb-4 bg-blue-500 transition-colors text-white mr-2">
+                                Scan Sekarang
+                            </button>
+                            <button onclick="window.location.href='/products/search'" class="px-4 py-2 border border-blue-300 rounded-lg hover:bg-blue-50 mb-4 bg-blue-500 transition-colors text-white">
+                                Cari Manual
+                            </button>
+                        </div>
                     </div>
                 `,
                 showConfirmButton: false,
@@ -355,12 +376,26 @@
                             const config = {
                                 fps: 10,
                                 qrbox: { width: 250, height: 250 },
-                                aspectRatio: 1
+                                aspectRatio: 1,
+                                formatsToSupport: [ 
+                                    Html5QrcodeSupportedFormats.EAN_13,
+                                    Html5QrcodeSupportedFormats.EAN_8,
+                                    Html5QrcodeSupportedFormats.CODE_128,
+                                    Html5QrcodeSupportedFormats.CODE_39,
+                                    Html5QrcodeSupportedFormats.UPC_A
+                                ],
+                                experimentalFeatures: {
+                                    useBarCodeDetectorIfSupported: true
+                                }
                             };
                             await html5Qrcode.start(
                                 { facingMode: "environment" }, 
                                 config,
-                                onScanSuccess
+                                onScanSuccess,
+                                (errorMessage) => {
+                                    // Handle scan error silently
+                                    console.log(errorMessage);
+                                }
                             );
                         }
                     } catch (err) {
