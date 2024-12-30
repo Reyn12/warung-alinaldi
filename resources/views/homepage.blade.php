@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Toko Alinaldi</title>
+    <script src="https://cdn.jsdelivr.net/npm/quagga@0.12.1/dist/quagga.min.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
@@ -322,90 +323,84 @@
     </div>
 
     <script>
-        let html5Qrcode = null;
-        let lastResult = null;
+        let isScanning = false;
+        let scanBuffer = [];
+        let isRedirecting = false;  
 
-        function onScanSuccess(decodedText, decodedResult) {
-            lastResult = decodedText;
-            console.log("Code detected:", decodedText);
-        }
+        function onScanSuccess(result) {
+            if (!result || !result.codeResult || !result.codeResult.code || isRedirecting) return;
+            
+            const code = result.codeResult.code;
+            
+            // Tambahkan ke buffer
+            scanBuffer.push(code);
+            
+            // Jika buffer sudah 3, ambil kode yang paling sering muncul
+            if (scanBuffer.length >= 3) {
+                const counts = {};
+                let maxCount = 0;
+                let mostFrequent = null;
 
-        async function scanNow() {
-            if (lastResult) {
-                // Stop scanner
-                stopScanner();
-                
-                // Close modal
-                Swal.close();
-
-                // Redirect ke halaman hasil scan
-                window.location.href = `/products/scan/${encodeURIComponent(lastResult)}`;
-            } else {
-                Swal.fire({
-                    title: 'Barcode tidak terdeteksi',
-                    text: 'Pastikan barcode berada dalam kotak scanner',
-                    icon: 'warning'
+                // Hitung frekuensi setiap kode
+                scanBuffer.forEach(code => {
+                    counts[code] = (counts[code] || 0) + 1;
+                    if (counts[code] > maxCount) {
+                        maxCount = counts[code];
+                        mostFrequent = code;
+                    }
                 });
+
+                // Jika ada kode yang muncul minimal 2 kali
+                if (maxCount >= 2 && !isRedirecting) {
+                    isRedirecting = true;  
+                    const finalCode = mostFrequent;
+                    
+                    // Hentikan scanner
+                    if (isScanning) {
+                        Quagga.stop();
+                        isScanning = false;
+                    }
+                    
+                    // Tampilkan loading dan redirect
+                    Swal.fire({
+                        title: 'Barcode Terdeteksi!',
+                        text: `Kode: ${finalCode}`,
+                        icon: 'success',
+                        showConfirmButton: false,
+                        timer: 1000
+                    }).then(() => {
+                        window.location.href = `/products/scan/${encodeURIComponent(finalCode)}`;
+                    });
+                }
             }
         }
 
         async function showQrisModal() {
+            // Reset flags
+            isRedirecting = false;
+            scanBuffer = [];
+            
             const modal = await Swal.fire({
                 title: 'Scan Barcode',
                 html: `
-                    <div class="mb-4 bg-white p-6 rounded-xl w-full h-full">
-                        <div id="reader" style="width: 100%"></div>
-                        <div class="mt-4 flex justify-center gap-2">
-                            <button id="scanButton" onclick="scanNow()" class="px-4 py-2 border border-blue-300 rounded-lg hover:bg-blue-50 mb-4 bg-blue-500 transition-colors text-white mr-2">
-                                Scan Sekarang
-                            </button>
-                            <button onclick="window.location.href='/products/search'" class="px-4 py-2 border border-blue-300 rounded-lg hover:bg-blue-50 mb-4 bg-blue-500 transition-colors text-white">
-                                Cari Manual
-                            </button>
-                        </div>
+                    <div id="interactive" class="viewport" style="width: 100%; height: 300px; position: relative;">
+                        <video style="width: 100%; height: 100%; object-fit: cover;"></video>
+                        <canvas class="drawingBuffer" style="width: 100%; height: 100%; position: absolute; top: 0; left: 0;"></canvas>
+                        <div class="scanner-overlay" style="position: absolute; top: 0; left: 0; right: 0; bottom: 0; border: 2px solid #fff; border-radius: 20px; box-shadow: 0 0 0 9999px rgba(0,0,0,0.5);"></div>
+                    </div>
+                    <div class="mt-4 text-center">
+                        <p class="mb-2 text-sm text-gray-600">Arahkan kamera ke barcode produk</p>
+                        <button onclick="window.location.href='/products/search'" class="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors">
+                            Cari Manual
+                        </button>
                     </div>
                 `,
                 showConfirmButton: false,
                 showCloseButton: true,
                 allowOutsideClick: false,
-                didOpen: async () => {
-                    try {
-                        html5Qrcode = new Html5Qrcode("reader");
-                        const devices = await Html5Qrcode.getCameras();
-                        if (devices && devices.length) {
-                            const config = {
-                                fps: 10,
-                                qrbox: { width: 250, height: 250 },
-                                aspectRatio: 1,
-                                formatsToSupport: [ 
-                                    Html5QrcodeSupportedFormats.EAN_13,
-                                    Html5QrcodeSupportedFormats.EAN_8,
-                                    Html5QrcodeSupportedFormats.CODE_128,
-                                    Html5QrcodeSupportedFormats.CODE_39,
-                                    Html5QrcodeSupportedFormats.UPC_A
-                                ],
-                                experimentalFeatures: {
-                                    useBarCodeDetectorIfSupported: true
-                                }
-                            };
-                            await html5Qrcode.start(
-                                { facingMode: "environment" }, 
-                                config,
-                                onScanSuccess,
-                                (errorMessage) => {
-                                    // Handle scan error silently
-                                    console.log(errorMessage);
-                                }
-                            );
-                        }
-                    } catch (err) {
-                        console.error("Error starting scanner:", err);
-                        Swal.fire({
-                            title: 'Error',
-                            text: 'Tidak dapat mengakses kamera. Pastikan browser mendapat izin untuk mengakses kamera.',
-                            icon: 'error'
-                        });
-                    }
+                width: '90%',
+                didOpen: () => {
+                    startScanner();
                 },
                 willClose: () => {
                     stopScanner();
@@ -413,15 +408,66 @@
             });
         }
 
-        async function stopScanner() {
-            if (html5Qrcode !== null) {
-                try {
-                    await html5Qrcode.stop();
-                    html5Qrcode = null;
-                } catch (err) {
-                    console.error("Error stopping scanner:", err);
+        function startScanner() {
+            if (isScanning) return;
+            
+            Quagga.init({
+                inputStream: {
+                    name: "Live",
+                    type: "LiveStream",
+                    target: "#interactive",
+                    constraints: {
+                        facingMode: "environment",
+                        aspectRatio: { min: 1, max: 2 },
+                        width: { min: 640 },
+                        height: { min: 480 }
+                    },
+                },
+                locator: {
+                    patchSize: "medium",
+                    halfSample: true
+                },
+                numOfWorkers: 4,
+                frequency: 10,
+                decoder: {
+                    readers: [
+                        "ean_reader",
+                        "ean_8_reader",
+                        "code_128_reader",
+                        "code_39_reader",
+                        "upc_reader",
+                        "upc_e_reader"
+                    ],
+                    multiple: false
+                },
+                locate: true
+            }, function(err) {
+                if (err) {
+                    console.error("Error starting Quagga:", err);
+                    Swal.fire({
+                        title: 'Error',
+                        text: 'Tidak dapat mengakses kamera. Pastikan browser mendapat izin kamera.',
+                        icon: 'error'
+                    });
+                    return;
                 }
+                
+                console.log("Quagga started successfully");
+                isScanning = true;
+                Quagga.start();
+            });
+
+            // Listen for scan events
+            Quagga.onDetected(onScanSuccess);
+        }
+
+        function stopScanner() {
+            if (isScanning) {
+                Quagga.stop();
+                isScanning = false;
             }
+            isRedirecting = false;
+            scanBuffer = [];
         }
     </script>
 

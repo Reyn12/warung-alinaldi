@@ -21,5 +21,6 @@ Route::middleware('auth')->group(function () {
 // Product Routes
 Route::get('/products/scan/{code}', [ProductController::class, 'scanResult'])->name('products.scan');
 Route::get('/products/search', [ProductController::class, 'manualSearch'])->name('products.search');
+Route::post('/products', [ProductController::class, 'store'])->name('products.store');
 
 require __DIR__.'/auth.php';
