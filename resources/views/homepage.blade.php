@@ -329,10 +329,18 @@
         </div>
     </div>
 
+    <!-- Audio untuk beep sound -->
+    <audio id="beepSound" src="{{ asset('sounds/beep.mp3') }}" preload="auto"></audio>
+
     <script>
         let isScanning = false;
         let scanBuffer = [];
         let isRedirecting = false;  
+
+        function playBeep() {
+            const audio = document.getElementById('beepSound');
+            audio.play();
+        }
 
         function onScanSuccess(result) {
             if (!result || !result.codeResult || !result.codeResult.code || isRedirecting) return;
@@ -367,6 +375,9 @@
                         Quagga.stop();
                         isScanning = false;
                     }
+
+                    // Play beep sound
+                    playBeep();
                     
                     // Tampilkan loading dan redirect
                     Swal.fire({
@@ -386,6 +397,11 @@
             // Reset flags
             isRedirecting = false;
             scanBuffer = [];
+            
+            // Inisialisasi audio dengan user interaction
+            const audio = document.getElementById('beepSound');
+            audio.load(); // Load audio
+            audio.volume = 0.5; // Set volume ke 50%
             
             const modal = await Swal.fire({
                 title: 'Scan Barcode',
@@ -407,7 +423,15 @@
                 allowOutsideClick: false,
                 width: '90%',
                 didOpen: () => {
-                    startScanner();
+                    // Play silent audio untuk unlock autoplay
+                    audio.play().then(() => {
+                        audio.pause(); // Pause setelah play
+                        audio.currentTime = 0; // Reset ke awal
+                        startScanner();
+                    }).catch(err => {
+                        console.log('Audio belum diizinkan:', err);
+                        startScanner();
+                    });
                 },
                 willClose: () => {
                     stopScanner();

@@ -1,8 +1,13 @@
+@php
+    use Illuminate\Support\Str;
+    use Illuminate\Support\Facades\Storage;
+@endphp
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Detail Produk</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
@@ -34,7 +39,11 @@
             <h1 class="text-2xl font-bold mb-4">Detail Produk</h1>
             
             <!-- Product Image -->
-            <img src="{{ asset('storage/' . $product->image) }}" alt="{{ $product->name }}" class="w-full h-48 object-cover rounded-lg mb-4">
+            @if(Str::startsWith($product->image, 'products/'))
+                <img src="{{ Storage::url($product->image) }}" alt="{{ $product->name }}" class="w-full h-48 object-cover rounded-lg mb-4">
+            @else
+                <img src="{{ asset($product->image) }}" alt="{{ $product->name }}" class="w-full h-48 object-cover rounded-lg mb-4">
+            @endif
             
             <!-- Product Details -->
             <div class="space-y-4">
@@ -76,81 +85,95 @@
             <a href="{{ route('keranjang.index') }}" class="text-blue-600 font-semibold">Lihat Keranjang</a>
         </div>
 
+        <!-- Audio element untuk beep sound -->
+        <audio id="beepSound" src="{{ asset('sounds/beep.mp3') }}" preload="auto"></audio>
+
         <script>
-            function updateQuantity(change) {
-                const quantityInput = document.getElementById('quantity');
-                let newQuantity = parseInt(quantityInput.value) + change;
-                const maxStock = {{ $product->stock }};
-                
-                if (newQuantity < 1) newQuantity = 1;
-                if (newQuantity > maxStock) newQuantity = maxStock;
-                
-                quantityInput.value = newQuantity;
+            // Fungsi untuk memainkan suara beep
+            function playBeepSound() {
+                const audio = document.getElementById('beepSound');
+                audio.play();
             }
 
-            function addToCart() {
-                const quantity = document.getElementById('quantity').value;
-                const productId = '{{ $product->id }}';
+            document.addEventListener('DOMContentLoaded', function() {
+                // Mainkan suara saat halaman dimuat (karena artinya scan berhasil)
+                playBeepSound();
 
-                // Tambahkan animasi loading pada tombol
-                const button = event.target;
-                const originalText = button.innerHTML;
-                button.innerHTML = 'Menambahkan...';
-                button.disabled = true;
+                function updateQuantity(change) {
+                    const quantityInput = document.getElementById('quantity');
+                    let newQuantity = parseInt(quantityInput.value) + change;
+                    const maxStock = {{ $product->stock }};
+                    
+                    if (newQuantity < 1) newQuantity = 1;
+                    if (newQuantity > maxStock) newQuantity = maxStock;
+                    
+                    quantityInput.value = newQuantity;
+                }
 
-                // Ubah URL ke HTTPS jika diperlukan
-                const url = '{{ route('keranjang.add') }}'.replace('http:', 'https:');
+                function addToCart() {
+                    const quantity = document.getElementById('quantity').value;
+                    const productId = '{{ $product->id }}';
 
-                fetch(url, {
-                    method: 'POST',
-                    body: JSON.stringify({
-                        product_id: productId,
-                        quantity: parseInt(quantity),
-                        _token: '{{ csrf_token() }}'
-                    }),
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json',
-                        'X-CSRF-TOKEN': '{{ csrf_token() }}'
-                    },
-                    credentials: 'same-origin'
-                })
-                .then(response => {
-                    if (!response.ok) {
-                        return response.json().then(err => Promise.reject(err));
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    if(data.success) {
-                        // Tampilkan notifikasi sukses
-                        const notification = document.createElement('div');
-                        notification.className = 'fixed top-4 left-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg text-center z-50';
-                        notification.textContent = 'Produk berhasil ditambahkan ke keranjang!';
-                        document.body.appendChild(notification);
+                    // Tambahkan animasi loading pada tombol
+                    const button = event.target;
+                    const originalText = button.innerHTML;
+                    button.innerHTML = 'Menambahkan...';
+                    button.disabled = true;
 
+                    // Ubah URL ke HTTPS jika diperlukan
+                    const url = '{{ route('keranjang.add') }}'.replace('http:', 'https:');
+
+                    fetch(url, {
+                        method: 'POST',
+                        body: JSON.stringify({
+                            product_id: productId,
+                            quantity: parseInt(quantity),
+                            _token: '{{ csrf_token() }}'
+                        }),
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': '{{ csrf_token() }}'
+                        },
+                        credentials: 'same-origin'
+                    })
+                    .then(response => {
+                        if (!response.ok) {
+                            return response.json().then(err => Promise.reject(err));
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        if(data.success) {
+                            // Tampilkan notifikasi sukses
+                            const notification = document.createElement('div');
+                            notification.className = 'fixed top-4 left-4 right-4 bg-green-500 text-white px-6 py-3 rounded-lg shadow-lg text-center z-50';
+                            notification.textContent = 'Produk berhasil ditambahkan ke keranjang!';
+                            document.body.appendChild(notification);
+
+                            setTimeout(() => {
+                                notification.remove();
+                            }, 3000);
+                        } else {
+                            throw new Error(data.message || 'Gagal menambahkan produk ke keranjang');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error:', error);
+                        const errorNotif = document.createElement('div');
+                        errorNotif.className = 'fixed top-4 left-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg text-center z-50';
+                        errorNotif.textContent = error.message || 'Terjadi kesalahan saat menambahkan ke keranjang';
+                        document.body.appendChild(errorNotif);
                         setTimeout(() => {
-                            notification.remove();
+                            errorNotif.remove();
                         }, 3000);
-                    } else {
-                        throw new Error(data.message || 'Gagal menambahkan produk ke keranjang');
-                    }
-                })
-                .catch(error => {
-                    console.error('Error:', error);
-                    const errorNotif = document.createElement('div');
-                    errorNotif.className = 'fixed top-4 left-4 right-4 bg-red-500 text-white px-6 py-3 rounded-lg shadow-lg text-center z-50';
-                    errorNotif.textContent = error.message || 'Terjadi kesalahan saat menambahkan ke keranjang';
-                    document.body.appendChild(errorNotif);
-                    setTimeout(() => {
-                        errorNotif.remove();
-                    }, 3000);
-                })
-                .finally(() => {
-                    button.innerHTML = originalText;
-                    button.disabled = false;
-                });
-            }
+                    })
+                    .finally(() => {
+                        button.innerHTML = originalText;
+                        button.disabled = false;
+                    });
+                }
+            });
         </script>
     </div>
 </body>
