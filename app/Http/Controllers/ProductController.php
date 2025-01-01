@@ -10,9 +10,6 @@ class ProductController extends Controller
 {
     public function scanResult($code)
     {
-        // Decode barcode
-        // $decodedCode = urldecode($code);
-        
         // Cari produk berdasarkan barcode
         $product = Product::where('barcode', $code)->first();
         
@@ -22,6 +19,25 @@ class ProductController extends Controller
                 'barcode' => $code
             ]);
         }
+
+        // Tambahkan otomatis ke keranjang
+        $cart = session()->get('keranjang', []);
+        
+        // Jika produk sudah ada di keranjang, tambah quantity
+        if(isset($cart[$product->id])) {
+            $cart[$product->id]['quantity'] += 1;
+        } else {
+            // Jika belum ada, tambahkan dengan quantity 1
+            $cart[$product->id] = [
+                'name' => $product->name,
+                'quantity' => 1,
+                'price' => $product->price,
+                'image' => $product->image
+            ];
+        }
+        
+        session()->put('keranjang', $cart);
+        session()->flash('success', 'Produk berhasil ditambahkan ke keranjang');
         
         return view('products.scan-result', [
             'product' => $product

@@ -103,41 +103,66 @@ class KeranjangController extends Controller
         }
     }
 
-    public function remove(Request $request, $id)
+    public function remove(Request $request)
     {
-        try {
-            Log::info('Removing item from cart:', [
-                'method' => $request->method(),
-                'id' => $id
+        $id = $request->id;
+        $cart = session()->get('keranjang', []);
+        
+        if(isset($cart[$id])) {
+            unset($cart[$id]);
+            session()->put('keranjang', $cart);
+            return response()->json([
+                'success' => true,
+                'message' => 'Item berhasil dihapus dari keranjang'
             ]);
-
-            $keranjang = session()->get('keranjang', []);
-            
-            if (isset($keranjang[$id])) {
-                unset($keranjang[$id]);
-                session()->put('keranjang', $keranjang);
-                return redirect()->back()->with('success', 'Produk dihapus dari keranjang');
-            }
-            
-            return redirect()->back()->with('error', 'Produk tidak ditemukan');
-        } catch (\Exception $e) {
-            Log::error('Error in KeranjangController@remove: ' . $e->getMessage());
-            return redirect()->back()->with('error', 'Terjadi kesalahan saat menghapus produk');
         }
+        
+        return response()->json([
+            'success' => false,
+            'message' => 'Item tidak ditemukan'
+        ]);
     }
 
     public function clear(Request $request)
     {
-        try {
-            Log::info('Clearing cart:', [
-                'method' => $request->method()
-            ]);
+        session()->forget('keranjang');
+        return redirect()->back()->with('success', 'Keranjang berhasil dikosongkan');
+    }
 
-            session()->forget('keranjang');
-            return redirect()->route('keranjang.index')->with('success', 'Keranjang berhasil dikosongkan');
+    public function update(Request $request)
+    {
+        try {
+            $cart = session()->get('keranjang', []);
+            $data = $request->json()->all();
+            $id = $data['id'];
+            $change = $data['change'];
+
+            if (isset($cart[$id])) {
+                $newQuantity = $cart[$id]['quantity'] + $change;
+                
+                // Pastikan quantity tidak kurang dari 1
+                if ($newQuantity < 1) {
+                    $newQuantity = 1;
+                }
+                
+                $cart[$id]['quantity'] = $newQuantity;
+                session()->put('keranjang', $cart);
+                
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Quantity berhasil diupdate'
+                ]);
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Produk tidak ditemukan'
+            ]);
         } catch (\Exception $e) {
-            Log::error('Error in KeranjangController@clear: ' . $e->getMessage());
-            return redirect()->route('keranjang.index')->with('error', 'Terjadi kesalahan saat mengosongkan keranjang');
+            return response()->json([
+                'success' => false,
+                'message' => $e->getMessage()
+            ], 500);
         }
     }
 }

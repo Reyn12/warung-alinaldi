@@ -1,77 +1,139 @@
 <!DOCTYPE html>
-<html lang="en">
+@php
+use Illuminate\Support\Str;
+@endphp
+<html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>Keranjang - Toko Alinaldi</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Lato:wght@400;700;900&display=swap" rel="stylesheet">
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Keranjang - Warung Alinaldi</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <!-- Font Awesome -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
-<body class="bg-gradient-to-b from-sky-400 to-white min-h-screen font-[Lato]">
-    <div class="max-w-md mx-auto px-4 py-6">
-        <!-- Header -->
-        <div class="flex items-center gap-4 mb-6">
-            <a href="/" class="p-2 rounded-full bg-white/20 hover:bg-white/30">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-                </svg>
+<body class="bg-blue-50">
+    <div class="container mx-auto px-4 py-8">
+        <div class="flex items-center mb-6">
+            <a href="{{ url()->previous() }}" class="text-3xl text-blue-500 mr-4">
+                <i class="fas fa-arrow-left"></i>
             </a>
-            <h1 class="text-xl font-bold text-white">Keranjang</h1>
+            <h1 class="text-3xl font-bold">Keranjang</h1>
+            <a href="/" class="ml-auto bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg flex items-center">
+                <i class="fas fa-barcode mr-2"></i>
+                Tambah Barang
+            </a>
         </div>
 
-        <!-- Cart Items -->
-        <div class="bg-white rounded-xl overflow-hidden shadow-md">
-            @if(count($items) > 0)
-                <div class="divide-y">
-                    @foreach($items as $item)
-                        <div class="p-4 flex justify-between items-center">
+        @if(session()->has('keranjang') && count(session('keranjang')) > 0)
+            <div class="bg-white rounded-lg shadow p-6">
+                @foreach(session('keranjang') as $id => $item)
+                    <div class="flex items-center justify-between border-b py-4">
+                        <div class="flex items-center space-x-4">
+                            @if($item['image'])
+                                @if(Str::startsWith($item['image'], 'products/'))
+                                    <img src="{{ asset('storage/' . $item['image']) }}" alt="{{ $item['name'] }}" class="w-16 h-16 object-cover rounded">
+                                @else
+                                    <img src="{{ asset($item['image']) }}" alt="{{ $item['name'] }}" class="w-16 h-16 object-cover rounded">
+                                @endif
+                            @else
+                                <div class="w-16 h-16 bg-gray-200 rounded flex items-center justify-center">
+                                    <i class="fas fa-image text-gray-400 text-2xl"></i>
+                                </div>
+                            @endif
                             <div>
-                                <h3 class="font-bold">{{ $item['name'] }}</h3>
-                                <p class="text-sm text-gray-600">{{ $item['quantity'] }} x Rp {{ number_format($item['price'], 0, ',', '.') }}</p>
-                            </div>
-                            <div class="flex items-center gap-4">
-                                <span class="font-bold">Rp {{ number_format($item['price'] * $item['quantity'], 0, ',', '.') }}</span>
-                                <form action="{{ route('keranjang.remove', $item['id']) }}" method="POST" class="inline">
-                                    @csrf
-                                    <button type="submit" onclick="return confirm('Yakin ingin menghapus item ini?')" class="text-red-500 hover:text-red-700">
-                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                                        </svg>
-                                    </button>
-                                </form>
+                                <h3 class="font-semibold text-lg">{{ $item['name'] }}</h3>
+                                <p class="text-gray-600">Rp {{ number_format($item['price'], 0, ',', '.') }}</p>
                             </div>
                         </div>
-                    @endforeach
-                </div>
-
-                <!-- Total -->
-                <div class="p-4 bg-gray-50">
-                    <div class="flex justify-between items-center">
-                        <span class="font-bold text-lg">Total</span>
-                        <span class="font-bold text-lg">Rp {{ number_format($total, 0, ',', '.') }}</span>
+                        <div class="flex items-center space-x-4">
+                            <div class="flex items-center space-x-2">
+                                <button onclick="updateCart({{ $id }}, -1)" class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center hover:bg-gray-300">
+                                    <i class="fas fa-minus text-gray-600"></i>
+                                </button>
+                                <span class="w-8 text-center font-medium">{{ $item['quantity'] }}</span>
+                                <button onclick="updateCart({{ $id }}, 1)" class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center hover:bg-gray-300">
+                                    <i class="fas fa-plus text-gray-600"></i>
+                                </button>
+                            </div>
+                            <button onclick="removeFromCart({{ $id }})" class="text-red-500 hover:text-red-700">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
                     </div>
-                </div>
+                @endforeach
 
-                <!-- Buttons -->
-                <div class="p-4 space-y-2">
-                    <form action="{{ route('keranjang.clear') }}" method="POST">
-                        @csrf
-                        <button type="submit" onclick="return confirm('Yakin ingin mengosongkan keranjang?')" class="w-full py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors">
+                <div class="mt-6 border-t pt-4">
+                    <div class="flex justify-between items-center mb-4">
+                        <span class="text-xl font-bold">Total</span>
+                        <span class="text-xl font-bold">Rp {{ number_format(collect(session('keranjang'))->sum(function($item) { 
+                            return $item['price'] * $item['quantity'];
+                        }), 0, ',', '.') }}</span>
+                    </div>
+
+                    <div class="space-y-3">
+                        <button onclick="clearCart()" class="w-full py-3 bg-red-500 text-white rounded-lg hover:bg-red-600 transition">
                             Kosongkan Keranjang
                         </button>
-                    </form>
-                    <a href="/checkout" class="block w-full py-2 bg-blue-500 text-white text-center rounded-lg hover:bg-blue-600 transition-colors">
-                        Checkout
-                    </a>
+                        <a href="{{ route('checkout.index') }}" class="block w-full py-3 bg-blue-500 text-white text-center rounded-lg hover:bg-blue-600 transition">
+                            Checkout
+                        </a>
+                    </div>
                 </div>
-            @else
-                <div class="p-8 text-center">
-                    <p class="text-gray-500">Keranjang masih kosong</p>
-                    <a href="/" class="mt-4 inline-block text-blue-500 hover:text-blue-600">Mulai Belanja</a>
-                </div>
-            @endif
-        </div>
+            </div>
+
+            <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+            <script>
+                const baseUrl = window.location.origin;
+
+                function updateCart(id, change) {
+                    axios.post(`${baseUrl}/keranjang/update`, {
+                        id: id,
+                        change: change
+                    })
+                    .then(function (response) {
+                        if (response.data.success) {
+                            location.reload();
+                        }
+                    })
+                    .catch(function (error) {
+                        console.error('Error:', error);
+                    });
+                }
+
+                function removeFromCart(id) {
+                    if (confirm('Apakah Anda yakin ingin menghapus produk ini?')) {
+                        fetch(`${baseUrl}/keranjang/remove`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({
+                                id: id
+                            })
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success) {
+                                location.reload();
+                            }
+                        });
+                    }
+                }
+
+                function clearCart() {
+                    if (confirm('Apakah Anda yakin ingin mengosongkan keranjang?')) {
+                        window.location.href = `${baseUrl}/keranjang/clear`;
+                    }
+                }
+            </script>
+        @else
+            <div class="text-center py-8">
+                <p class="text-gray-500 text-lg">Keranjang belanja Anda kosong</p>
+                <a href="{{ route('homepage') }}" class="mt-4 inline-block bg-blue-500 text-white px-6 py-2 rounded-lg hover:bg-blue-600 transition">
+                    Mulai Belanja
+                </a>
+            </div>
+        @endif
     </div>
 </body>
 </html>
